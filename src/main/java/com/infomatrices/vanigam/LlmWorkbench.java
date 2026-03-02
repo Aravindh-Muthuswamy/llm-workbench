@@ -36,7 +36,7 @@ public class LlmWorkbench {
         System.setProperty( "apple.awt.application.appearance", "system" );
         newLoadingJFrame.loadingJLabel.setText("Initialising Database...");
         newLoadingJFrame.jProgressBar.setValue(20);
-        SQLiteDatabaseCreator.createDatabaseOrCheckConnection(newLoadingJFrame.loadingJLabel, newLoadingJFrame.jProgressBar);
+//        SQLiteDatabaseCreator.createDatabaseOrCheckConnection(newLoadingJFrame.loadingJLabel, newLoadingJFrame.jProgressBar);
         DashboardForm dashboardForm = new DashboardForm();
         try{
             dashboardForm.setIconImage(new ImageIcon(dashboardForm.getClass().getResource("/icons/attachment.png")).getImage());

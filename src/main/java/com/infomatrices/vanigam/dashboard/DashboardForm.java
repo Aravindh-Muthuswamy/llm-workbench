@@ -693,7 +693,7 @@ public class DashboardForm extends javax.swing.JFrame {
             Object userObj = node.getUserObject();
 
             if (!(userObj instanceof java.io.File)) {
-                setIcon(FontIcon.of(Codicons.FILE, 16, DEFAULT_COLOR));
+                
                 return this;
             }
 
@@ -701,76 +701,13 @@ public class DashboardForm extends javax.swing.JFrame {
             setText(file.getName());
 
             if (file.isDirectory()) {
-                setIcon(FontIcon.of(
-                        expanded ? Codicons.FOLDER_OPENED : Codicons.FOLDER,
-                        16,
-                        expanded ? FOLDER_OPEN_COLOR : FOLDER_COLOR));
-            } else {
-                setIcon(getFileIcon(getExtension(file.getName())));
-            }
+                
+            } 
 
             return this;
         }
 
-        private FontIcon getFileIcon(String ext) {
-            switch (ext) {
-                // Java
-                case "java":
-                case "class":
-                case "jar":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, JAVA_COLOR);
-                // Web
-                case "html":
-                case "htm":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, new Color(0xE44D26));
-                case "css":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, new Color(0x264DE4));
-                case "js":
-                case "ts":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, new Color(0xF7DF1E));
-                // Data
-                case "json":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, DATA_COLOR);
-                case "xml":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, new Color(0xF4A261));
-                case "sql":
-                    return FontIcon.of(Codicons.DATABASE, 16, new Color(0x00ADB5));
-                case "yaml":
-                case "yml":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, new Color(0xCB4335));
-                // Docs
-                case "md":
-                    return FontIcon.of(Codicons.MARKDOWN, 16, WEB_COLOR);
-                case "txt":
-                case "log":
-                    return FontIcon.of(Codicons.FILE, 16, TEXT_COLOR);
-                case "pdf":
-                    return FontIcon.of(Codicons.FILE_PDF, 16, new Color(0xE74C3C));
-                // Images
-                case "png":
-                case "jpg":
-                case "jpeg":
-                case "gif":
-                case "svg":
-                case "ico":
-                    return FontIcon.of(Codicons.FILE_MEDIA, 16, IMAGE_COLOR);
-                // Config
-                case "properties":
-                case "env":
-                case "ini":
-                    return FontIcon.of(Codicons.SETTINGS_GEAR, 16, TEXT_COLOR);
-                // Shell
-                case "sh":
-                case "bat":
-                case "cmd":
-                    return FontIcon.of(Codicons.TERMINAL, 16, DATA_COLOR);
-                // Python
-                case "py":
-                    return FontIcon.of(Codicons.FILE_CODE, 16, new Color(0x3572A5));
-                default:
-                    return FontIcon.of(Codicons.FILE, 16, DEFAULT_COLOR);
-            }
-        }
+        
 
         private String getExtension(String name) {
             int dot = name.lastIndexOf('.');
