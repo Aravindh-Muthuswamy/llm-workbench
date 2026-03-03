@@ -4,6 +4,9 @@
  */
 package com.infomatrices.vanigam.dashboard;
 
+import static com.infomatrices.vanigam.utils.CodeUtils.getSyntaxStyle;
+import com.infomatrices.vanigam.utils.FileSearchWorker;
+import com.infomatrices.vanigam.utils.PromptGenerator;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -40,8 +43,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import org.kordamp.ikonli.codicons.Codicons;
-import org.kordamp.ikonli.swing.FontIcon;
+import org.fife.ui.rtextarea.SearchContext;
 
 /**
  *
@@ -63,6 +65,10 @@ public class DashboardForm extends javax.swing.JFrame {
     private JTabbedPane editorTabs;
     private java.util.Map<File, Integer> openFileTabs = new java.util.HashMap<>();
     private RSyntaxTextArea ddlArea;
+    private SearchContext searchContext = new SearchContext();
+    private javax.swing.SwingWorker<Void, DefaultMutableTreeNode> searchWorker;
+    private File projectRootFolder;
+    private JComboBox<String> templateSelector;
 
     /**
      * Creates new form DashboardForm
@@ -126,14 +132,25 @@ public class DashboardForm extends javax.swing.JFrame {
         clearBtn.addActionListener(e -> promptArea.setText(""));
 
         verboseCheckBox = new JCheckBox("Verbose");
-        verboseCheckBox.setSelected(false);   // unchecked by default
+        verboseCheckBox.setSelected(false);
 
-        JPanel btnPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
+        templateSelector = new JComboBox<>(new String[]{
+            "General Programming Tasks",
+            "SQL Query Tasks",
+            "Analyse Only"
+        });
+
+        JLabel templateLabel = new JLabel("Template:");
+
+        JPanel btnPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 2));
+        btnPanel.add(templateLabel);
+        btnPanel.add(templateSelector);
+        btnPanel.add(new JSeparator(JSeparator.VERTICAL));
+        btnPanel.add(verboseCheckBox);
+        btnPanel.add(new JSeparator(JSeparator.VERTICAL));
         btnPanel.add(generateBtn);
         btnPanel.add(copyBtn);
         btnPanel.add(clearBtn);
-        btnPanel.add(new JSeparator(JSeparator.VERTICAL));
-        btnPanel.add(verboseCheckBox);
 
         promptJPanel.setLayout(new BorderLayout());
         promptJPanel.add(btnPanel, BorderLayout.NORTH);
@@ -142,6 +159,135 @@ public class DashboardForm extends javax.swing.JFrame {
         promptJPanel.revalidate();
         promptJPanel.repaint();
 
+    }
+
+    private JPanel createFindBar() {
+        JTextField findField = new JTextField(20);
+        JTextField replaceField = new JTextField(20);
+
+        JCheckBox matchCase = new JCheckBox("Match Case");
+        JCheckBox wholeWord = new JCheckBox("Whole Word");
+        JCheckBox regex = new JCheckBox("Regex");
+
+        JButton findNext = new JButton("Find Next");
+        JButton findPrev = new JButton("Find Prev");
+        JButton replaceBtn = new JButton("Replace");
+        JButton replaceAll = new JButton("Replace All");
+        JButton closeBtn = new JButton("✕");
+
+        // Labels
+        JLabel findLabel = new JLabel("Find:");
+        JLabel replaceLabel = new JLabel("Replace:");
+
+        JPanel bar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 4, 2));
+        bar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, java.awt.Color.GRAY));
+        bar.add(findLabel);
+        bar.add(findField);
+        bar.add(replaceLabel);
+        bar.add(replaceField);
+        bar.add(matchCase);
+        bar.add(wholeWord);
+        bar.add(regex);
+        bar.add(findNext);
+        bar.add(findPrev);
+        bar.add(replaceBtn);
+        bar.add(replaceAll);
+        bar.add(closeBtn);
+
+        // Actions
+        findNext.addActionListener(e -> doFind(findField.getText(), true, matchCase, wholeWord, regex));
+        findPrev.addActionListener(e -> doFind(findField.getText(), false, matchCase, wholeWord, regex));
+
+        replaceBtn.addActionListener(e -> {
+            RSyntaxTextArea editor = getActiveEditor();
+            if (editor == null || findField.getText().isEmpty()) {
+                return;
+            }
+            updateSearchContext(findField.getText(), matchCase, wholeWord, regex);
+            searchContext.setReplaceWith(replaceField.getText());
+            org.fife.ui.rtextarea.SearchEngine.replace(editor, searchContext);
+            // Find next after replace
+            org.fife.ui.rtextarea.SearchEngine.find(editor, searchContext);
+        });
+
+        replaceAll.addActionListener(e -> {
+            RSyntaxTextArea editor = getActiveEditor();
+            if (editor == null || findField.getText().isEmpty()) {
+                return;
+            }
+            updateSearchContext(findField.getText(), matchCase, wholeWord, regex);
+            searchContext.setReplaceWith(replaceField.getText());
+            org.fife.ui.rtextarea.SearchEngine.replaceAll(editor, searchContext);
+        });
+
+        // Close hides the bar
+        closeBtn.addActionListener(e -> {
+            bar.setVisible(false);
+            RSyntaxTextArea editor = getActiveEditor();
+            if (editor != null) {
+                editor.requestFocusInWindow();
+            }
+        });
+
+        // Find on Enter key in find field
+        findField.addActionListener(e
+                -> doFind(findField.getText(), true, matchCase, wholeWord, regex));
+
+        // Auto-search as you type
+        findField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                doFind(findField.getText(), true, matchCase, wholeWord, regex);
+            }
+
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                doFind(findField.getText(), true, matchCase, wholeWord, regex);
+            }
+
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+            }
+        });
+
+        bar.setVisible(false); // hidden by default
+        return bar;
+    }
+
+    private void updateSearchContext(String text, JCheckBox matchCase,
+            JCheckBox wholeWord, JCheckBox regex) {
+        searchContext.setSearchFor(text);
+        searchContext.setMatchCase(matchCase.isSelected());
+        searchContext.setWholeWord(wholeWord.isSelected());
+        searchContext.setRegularExpression(regex.isSelected());
+        searchContext.setSearchForward(true);
+        searchContext.setMarkAll(true);  // highlights all matches
+    }
+
+    private RSyntaxTextArea getActiveEditor() {
+        int idx = editorTabs.getSelectedIndex();
+        if (idx == -1) {
+            return null;
+        }
+        java.awt.Component comp = editorTabs.getComponentAt(idx);
+        if (!(comp instanceof RTextScrollPane)) {
+            return null;
+        }
+        return (RSyntaxTextArea) ((RTextScrollPane) comp).getViewport().getView();
+    }
+
+    private void doFind(String text, boolean forward, JCheckBox matchCase,
+            JCheckBox wholeWord, JCheckBox regex) {
+        RSyntaxTextArea editor = getActiveEditor();
+        if (editor == null || text.isEmpty()) {
+            return;
+        }
+        updateSearchContext(text, matchCase, wholeWord, regex);
+        searchContext.setSearchForward(forward);
+        org.fife.ui.rtextarea.SearchResult result
+                = org.fife.ui.rtextarea.SearchEngine.find(editor, searchContext);
+        if (!result.wasFound()) {
+            // Wrap around
+            editor.setCaretPosition(forward ? 0 : editor.getDocument().getLength());
+            org.fife.ui.rtextarea.SearchEngine.find(editor, searchContext);
+        }
     }
 
     private static class ProjectState implements java.io.Serializable {
@@ -262,7 +408,7 @@ public class DashboardForm extends javax.swing.JFrame {
                     "Project loaded successfully.",
                     "Loaded", JOptionPane.INFORMATION_MESSAGE);
             if (state.projectFolder != null && !state.projectFolder.isEmpty()) {
-                setTitle("LLM Workbench - " + new File(state.projectFolder).getName());
+                setTitle("LLM Workbench v0.2 - " + new File(state.projectFolder).getName());
             }
 
         } catch (Exception ex) {
@@ -273,102 +419,25 @@ public class DashboardForm extends javax.swing.JFrame {
     }
 
     private void generatePrompt() {
-        if (listModel.isEmpty()) {
+        String template = templateSelector != null
+                ? (String) templateSelector.getSelectedItem()
+                : "General Programming Tasks";
+
+        boolean isSql = "SQL Query Tasks".equals(template);
+
+        // Only require files for non-SQL templates
+        if (!isSql && listModel.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "No files in the list. Right-click files in the tree to add them.",
                     "No Files", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        boolean verbose = verboseCheckBox.isSelected();
-        String ddl = ddlArea.getText().trim();
-        boolean hasDdl = !ddl.isEmpty()
-                && !ddl.equals("-- Paste your DDL statements here")
-                && !ddl.equals("-- Paste your DDL statements here\n-- e.g. CREATE TABLE, ALTER TABLE...");
+        String ddlContent = ddlArea != null ? ddlArea.getText() : "";
+        boolean verbose = verboseCheckBox != null && verboseCheckBox.isSelected();
 
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("You are an expert software developer.\n");
-        sb.append("Below is a list of source files that need to be implemented.\n");
-        sb.append("Each file contains `//TODO-LLM` comments marking exactly where ");
-        sb.append("code needs to be written.\n\n");
-
-        // ── DDL section ──────────────────────────────────────────────────────
-        if (hasDdl) {
-            sb.append("## Database Schema (DDL)\n");
-            sb.append("The following DDL defines the database schema your implementation must align with.\n");
-            sb.append("Use the correct table names, column names, and data types from this schema.\n\n");
-            sb.append("```sql\n");
-            sb.append(ddl).append("\n");
-            sb.append("```\n\n");
-        }
-
-        sb.append("## Task\n");
-        sb.append("For each file listed below:\n");
-        sb.append("1. Read the filename and understand the language.\n");
-        sb.append("2. Locate every `//TODO-LLM` comment inside the file.\n");
-        sb.append("3. Replace each `//TODO-LLM` with a complete, correct implementation.\n");
-        if (hasDdl) {
-            sb.append("4. Ensure all database operations match the DDL schema provided above.\n");
-            sb.append("5. Return the full updated file content for each file.\n");
-            sb.append("6. Do not remove or modify any existing code outside the `//TODO-LLM` markers.\n\n");
-        } else {
-            sb.append("4. Return the full updated file content for each file.\n");
-            sb.append("5. Do not remove or modify any existing code outside the `//TODO-LLM` markers.\n\n");
-        }
-
-        sb.append("## Files\n\n");
-
-        for (int i = 0; i < listModel.size(); i++) {
-            File file = listModel.getElementAt(i);
-            String lang = getLanguageFromExtension(getFileExtension(file.getName()));
-
-            sb.append("### File ").append(i + 1).append(": `").append(file.getName()).append("`\n");
-            sb.append("- **Path:** `").append(file.getAbsolutePath()).append("`\n");
-            sb.append("- **Language:** ").append(lang).append("\n");
-
-            if (verbose) {
-                java.util.List<String> todos = scanTodos(file);
-                if (!todos.isEmpty()) {
-                    sb.append("- **TODO-LLM markers found:**\n");
-                    for (String todo : todos) {
-                        sb.append("  - Line ").append(todo).append("\n");
-                    }
-                } else {
-                    sb.append("- **TODO-LLM markers:** None found.\n");
-                }
-
-                sb.append("\n```").append(lang.toLowerCase()).append("\n");
-                try {
-                    String content = new String(java.nio.file.Files.readAllBytes(file.toPath()));
-                    sb.append(content);
-                    if (!content.endsWith("\n")) {
-                        sb.append("\n");
-                    }
-                } catch (java.io.IOException ex) {
-                    sb.append("// Could not read file: ").append(ex.getMessage()).append("\n");
-                }
-                sb.append("```\n\n");
-            } else {
-                long todoCount = scanTodos(file).size();
-                sb.append("- **TODO-LLM markers:** ").append(todoCount).append(" found.\n\n");
-            }
-        }
-
-        sb.append("## Instructions\n");
-        sb.append("- Implement all `//TODO-LLM` markers with complete, production-quality code.\n");
-        sb.append("- Preserve all existing code, imports, and structure.\n");
-        sb.append("- Follow the conventions and style already present in each file.\n");
-        if (hasDdl) {
-            sb.append("- All SQL queries and entity mappings must strictly follow the DDL schema above.\n");
-            sb.append("- Use exact table and column names as defined in the DDL.\n");
-        }
-        if (!verbose) {
-            sb.append("- Read each file from the provided path before implementing.\n");
-        }
-        sb.append("- Return each file as a separate fenced code block labeled with the filename.\n");
-
-        promptArea.setText(sb.toString());
+        PromptGenerator generator = new PromptGenerator(listModel, ddlContent, verbose, template);
+        promptArea.setText(generator.generate());
         promptArea.setCaretPosition(0);
 
     }
@@ -386,56 +455,6 @@ public class DashboardForm extends javax.swing.JFrame {
         } catch (java.io.IOException ignored) {
         }
         return todos;
-    }
-
-    private String getLanguageFromExtension(String ext) {
-        switch (ext) {
-            case "java":
-                return "Java";
-            case "py":
-                return "Python";
-            case "js":
-                return "JavaScript";
-            case "ts":
-                return "TypeScript";
-            case "html":
-                return "HTML";
-            case "css":
-                return "CSS";
-            case "xml":
-                return "XML";
-            case "json":
-                return "JSON";
-            case "sql":
-                return "SQL";
-            case "cpp":
-                return "C++";
-            case "c":
-                return "C";
-            case "cs":
-                return "C#";
-            case "rb":
-                return "Ruby";
-            case "php":
-                return "PHP";
-            case "sh":
-                return "Shell";
-            case "kt":
-                return "Kotlin";
-            case "swift":
-                return "Swift";
-            case "go":
-                return "Go";
-            case "rs":
-                return "Rust";
-            case "md":
-                return "Markdown";
-            case "yaml":
-            case "yml":
-                return "YAML";
-            default:
-                return "Text";
-        }
     }
 
     private void loadComponents() {
@@ -515,15 +534,43 @@ public class DashboardForm extends javax.swing.JFrame {
         JTabbedPane terminalTabs = new JTabbedPane();
         terminalTabs.addTab("Terminal", terminal);
         terminalTabs.setPreferredSize(new Dimension(0, 220));
+// Add a permanent "+" tab at the end
+        terminalTabs.addTab("+", null);
+        int plusTabIndex = terminalTabs.getTabCount() - 1;
 
-        // Add new terminal tab button
-        JButton newTermBtn = new JButton("+ New Terminal");
-        newTermBtn.addActionListener(e -> {
-            JediTermWidget newTerm = createTerminal();
-            terminalTabs.addTab("Terminal " + terminalTabs.getTabCount(), newTerm);
-            terminalTabs.setSelectedComponent(newTerm);
+        terminalTabs.addChangeListener(e -> {
+            int selected = terminalTabs.getSelectedIndex();
+            if (selected == terminalTabs.getTabCount() - 1) {
+
+                // Snap back immediately so UI doesn't freeze on "+" tab
+                int prev = selected - 1;
+                if (prev >= 0) {
+                    terminalTabs.setSelectedIndex(prev);
+                }
+
+                // Create terminal in background thread
+                new javax.swing.SwingWorker<JediTermWidget, Void>() {
+                    @Override
+                    protected JediTermWidget doInBackground() {
+                        return createTerminal();  // runs off EDT
+                    }
+
+                    @Override
+                    protected void done() {
+                        try {
+                            JediTermWidget newTerm = get();
+                            int insertAt = terminalTabs.getTabCount() - 1; // before "+"
+                            terminalTabs.insertTab("Terminal " + insertAt, null, newTerm, null, insertAt);
+                            terminalTabs.setSelectedIndex(insertAt);
+                        } catch (Exception ex) {
+                            JOptionPane.showMessageDialog(null,
+                                    "Could not start terminal: " + ex.getMessage(),
+                                    "Terminal Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                }.execute();
+            }
         });
-        terminalTabs.add(newTermBtn);  // adds as last tab
 
         listModel = new DefaultListModel<>();
         fileList = new JList<>(listModel);
@@ -631,14 +678,40 @@ public class DashboardForm extends javax.swing.JFrame {
                 }
             }
         });
+        JPanel findBar = createFindBar();
 
+// Wrap editorTabs + findBar in a panel
+        JPanel editorPanel = new JPanel(new BorderLayout());
+        editorPanel.add(editorTabs, BorderLayout.CENTER);
+        editorPanel.add(findBar, BorderLayout.SOUTH);
+
+        KeyStroke ctrlF = KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F,
+                java.awt.Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx());
+
+        editorPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ctrlF, "showFind");
+        editorPanel.getActionMap().put("showFind", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                findBar.setVisible(!findBar.isVisible());
+                if (findBar.isVisible()) {
+                    // Focus the find field when opened
+                    java.awt.Component[] comps = findBar.getComponents();
+                    for (java.awt.Component c : comps) {
+                        if (c instanceof JTextField) {
+                            c.requestFocusInWindow();
+                            break;
+                        }
+                    }
+                }
+            }
+        });
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBorder(BorderFactory.createTitledBorder("Project Files"));
         leftPanel.add(searchPanel, BorderLayout.NORTH);
         leftPanel.add(treeScroll, BorderLayout.CENTER);
+// Use editorPanel in the split pane instead of editorTabs directly
+        JSplitPane centerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, editorPanel);
 
-// Center split: tree | editor
-        JSplitPane centerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, editorTabs);
         centerSplit.setDividerLocation(220);
         centerSplit.setOneTouchExpandable(true);
         centerSplit.setContinuousLayout(true);
@@ -656,7 +729,19 @@ public class DashboardForm extends javax.swing.JFrame {
         outerSplit.setOneTouchExpandable(true);
         outerSplit.setContinuousLayout(true);
         outerSplit.setResizeWeight(0.75);
+        java.awt.Color white = java.awt.Color.WHITE;
 
+        jPanel1.setBackground(white);
+        leftPanel.setBackground(white);
+        searchPanel.setBackground(white);
+        editorPanel.setBackground(white);
+        rightPanel.setBackground(white);
+        promptJPanel.setBackground(white);
+        ddlJPanel.setBackground(white);
+        terminalTabs.setBackground(white);
+        editorTabs.setBackground(white);
+        tree.setBackground(white);
+        fileList.setBackground(white);
         workbenchJPanel.setLayout(new BorderLayout());
         workbenchJPanel.add(outerSplit, BorderLayout.CENTER);
 
@@ -693,7 +778,7 @@ public class DashboardForm extends javax.swing.JFrame {
             Object userObj = node.getUserObject();
 
             if (!(userObj instanceof java.io.File)) {
-                
+
                 return this;
             }
 
@@ -701,13 +786,11 @@ public class DashboardForm extends javax.swing.JFrame {
             setText(file.getName());
 
             if (file.isDirectory()) {
-                
-            } 
+
+            }
 
             return this;
         }
-
-        
 
         private String getExtension(String name) {
             int dot = name.lastIndexOf('.');
@@ -734,6 +817,17 @@ public class DashboardForm extends javax.swing.JFrame {
 
         if (file == null) {
             saveAs();
+            return;
+        }
+
+        // Confirmation dialog
+        int choice = JOptionPane.showConfirmDialog(this,
+                "Save changes to " + file.getName() + "?",
+                "Save File",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+
+        if (choice != JOptionPane.YES_OPTION) {
             return;
         }
 
@@ -834,6 +928,7 @@ public class DashboardForm extends javax.swing.JFrame {
     private void loadDirectoryTree(File folder) {
         // Create root node
         root = new DefaultMutableTreeNode(folder);
+        projectRootFolder = folder;
 
         // Add children; if a child is a folder, add a dummy node so it shows the expand arrow
         addChildren(root, folder);
@@ -912,7 +1007,7 @@ public class DashboardForm extends javax.swing.JFrame {
                 return this;
             }
         });
-        setTitle("LLM Workbench - " + folder.getName());  // add this
+        setTitle("LLM Workbench v0.2 - " + folder.getName());  // add this
 
     }
 
@@ -1095,7 +1190,7 @@ public class DashboardForm extends javax.swing.JFrame {
             int choice = JOptionPane.showConfirmDialog(this,
                     "Save changes to " + file.getName() + "?",
                     "Unsaved Changes",
-                    JOptionPane.YES_NO_CANCEL_OPTION);
+                    JOptionPane.YES_NO_OPTION);
             if (choice == JOptionPane.YES_OPTION) {
                 RTextScrollPane scroll = (RTextScrollPane) editorTabs.getComponentAt(tabIndex);
                 RSyntaxTextArea editor = (RSyntaxTextArea) scroll.getViewport().getView();
@@ -1129,72 +1224,38 @@ public class DashboardForm extends javax.swing.JFrame {
         return (dot != -1) ? fileName.substring(dot + 1).toLowerCase() : "";
     }
 
-    private String getSyntaxStyle(String ext) {
-        switch (ext) {
-            case "java":
-                return SyntaxConstants.SYNTAX_STYLE_JAVA;
-            case "py":
-                return SyntaxConstants.SYNTAX_STYLE_PYTHON;
-            case "js":
-                return SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT;
-            case "ts":
-                return SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT;
-            case "html":
-                return SyntaxConstants.SYNTAX_STYLE_HTML;
-            case "xml":
-                return SyntaxConstants.SYNTAX_STYLE_XML;
-            case "json":
-                return SyntaxConstants.SYNTAX_STYLE_JSON;
-            case "sql":
-                return SyntaxConstants.SYNTAX_STYLE_SQL;
-            case "css":
-                return SyntaxConstants.SYNTAX_STYLE_CSS;
-            case "c":
-            case "h":
-                return SyntaxConstants.SYNTAX_STYLE_C;
-            case "cpp":
-                return SyntaxConstants.SYNTAX_STYLE_CPLUSPLUS;
-            case "cs":
-                return SyntaxConstants.SYNTAX_STYLE_CSHARP;
-            case "php":
-                return SyntaxConstants.SYNTAX_STYLE_PHP;
-            case "rb":
-                return SyntaxConstants.SYNTAX_STYLE_RUBY;
-            case "sh":
-            case "bash":
-                return SyntaxConstants.SYNTAX_STYLE_UNIX_SHELL;
-            case "bat":
-            case "cmd":
-                return SyntaxConstants.SYNTAX_STYLE_WINDOWS_BATCH;
-            case "yaml":
-            case "yml":
-                return SyntaxConstants.SYNTAX_STYLE_YAML;
-            case "md":
-                return SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
-            case "properties":
-                return SyntaxConstants.SYNTAX_STYLE_PROPERTIES_FILE;
-            default:
-                return SyntaxConstants.SYNTAX_STYLE_NONE;
-        }
-    }
-
     private void filterTree() {
         String query = searchField.getText().trim().toLowerCase();
 
+        // Cancel any running search
+        if (searchWorker != null && !searchWorker.isDone()) {
+            searchWorker.cancel(true);
+        }
+
+        // Empty query — restore original tree
         if (query.isEmpty()) {
-            tree.setModel(treeModel);  // restore original tree
+            tree.setModel(treeModel);
+            tree.setCellRenderer(new FileTreeCellRenderer());
             return;
         }
 
-        // Build a filtered tree with only matching nodes
-        DefaultMutableTreeNode filteredRoot = new DefaultMutableTreeNode(root.getUserObject());
-        filterNode(root, filteredRoot, query);
+        if (projectRootFolder == null) {
+            return;
+        }
 
-        DefaultTreeModel filteredModel = new DefaultTreeModel(filteredRoot);
-        tree.setModel(filteredModel);
+        // Build fresh search tree
+        DefaultMutableTreeNode searchRoot = new DefaultMutableTreeNode(projectRootFolder);
+        DefaultTreeModel searchModel = new DefaultTreeModel(searchRoot);
+        tree.setModel(searchModel);
+        tree.setCellRenderer(new FileTreeCellRenderer());
 
-        // Expand all results
-        expandAll(tree);
+        // Show "Searching..." placeholder
+        searchRoot.add(new DefaultMutableTreeNode("Searching..."));
+        searchModel.nodeStructureChanged(searchRoot);
+
+        // Delegate to worker
+        searchWorker = new FileSearchWorker(projectRootFolder, query, searchRoot, searchModel, tree);
+        searchWorker.execute();
     }
 
 // Recursively copies matching nodes into filteredParent
@@ -1496,7 +1557,7 @@ public class DashboardForm extends javax.swing.JFrame {
             verboseCheckBox.setSelected(false);
         }
 
-        setTitle("LLM Workbench - New Project");
+        setTitle("LLM Workbench v0.2 - New Project");
     }
 
     /**
@@ -1511,16 +1572,28 @@ public class DashboardForm extends javax.swing.JFrame {
         jMenuItem1 = new javax.swing.JMenuItem();
         jMenuItem4 = new javax.swing.JMenuItem();
         jMenuItem7 = new javax.swing.JMenuItem();
+        jMenuBar2 = new javax.swing.JMenuBar();
+        jMenu1 = new javax.swing.JMenu();
+        jMenu2 = new javax.swing.JMenu();
         jPanel2 = new javax.swing.JPanel();
         jDesktopPane1 = new javax.swing.JDesktopPane();
-        welcomeJLabel1 = new javax.swing.JLabel();
-        welcomeJLabel2 = new javax.swing.JLabel();
         LLMWorkBenchJTabbedPane = new javax.swing.JTabbedPane();
         jPanel1 = new javax.swing.JPanel();
         workbenchJPanel = new javax.swing.JPanel();
         ddlJPanel = new javax.swing.JPanel();
         jPanel3 = new javax.swing.JPanel();
         promptJPanel = new javax.swing.JPanel();
+        jToolBar1 = new javax.swing.JToolBar();
+        jButton1 = new javax.swing.JButton();
+        jButton2 = new javax.swing.JButton();
+        jButton3 = new javax.swing.JButton();
+        jLabel1 = new javax.swing.JLabel();
+        jButton5 = new javax.swing.JButton();
+        jButton4 = new javax.swing.JButton();
+        jToolBar2 = new javax.swing.JToolBar();
+        jToolBar3 = new javax.swing.JToolBar();
+        welcomeJLabel1 = new javax.swing.JLabel();
+        welcomeJLabel2 = new javax.swing.JLabel();
         jMenuBar1 = new javax.swing.JMenuBar();
         masterJMenu = new javax.swing.JMenu();
         newProjectJMenuItem = new javax.swing.JMenuItem();
@@ -1538,8 +1611,14 @@ public class DashboardForm extends javax.swing.JFrame {
 
         jMenuItem7.setText("jMenuItem7");
 
+        jMenu1.setText("File");
+        jMenuBar2.add(jMenu1);
+
+        jMenu2.setText("Edit");
+        jMenuBar2.add(jMenu2);
+
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("LLM Workbench v1.0");
+        setTitle("LLM Workbench v0.2");
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -1570,22 +1649,22 @@ public class DashboardForm extends javax.swing.JFrame {
             }
         });
 
-        welcomeJLabel1.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
-        welcomeJLabel1.setText("LLM Workbench v1.0");
+        LLMWorkBenchJTabbedPane.setBackground(new java.awt.Color(255, 255, 255));
+        LLMWorkBenchJTabbedPane.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(153, 153, 153)));
+        LLMWorkBenchJTabbedPane.setTabPlacement(javax.swing.JTabbedPane.BOTTOM);
+        LLMWorkBenchJTabbedPane.setMinimumSize(new java.awt.Dimension(140, 95));
 
-        welcomeJLabel2.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
-        welcomeJLabel2.setForeground(new java.awt.Color(255, 51, 51));
-        welcomeJLabel2.setText("Research Preview");
+        workbenchJPanel.setBackground(new java.awt.Color(255, 255, 255));
 
         javax.swing.GroupLayout workbenchJPanelLayout = new javax.swing.GroupLayout(workbenchJPanel);
         workbenchJPanel.setLayout(workbenchJPanelLayout);
         workbenchJPanelLayout.setHorizontalGroup(
             workbenchJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 913, Short.MAX_VALUE)
+            .addGap(0, 895, Short.MAX_VALUE)
         );
         workbenchJPanelLayout.setVerticalGroup(
             workbenchJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 618, Short.MAX_VALUE)
+            .addGap(0, 580, Short.MAX_VALUE)
         );
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
@@ -1601,28 +1680,32 @@ public class DashboardForm extends javax.swing.JFrame {
 
         LLMWorkBenchJTabbedPane.addTab("Workbench", jPanel1);
 
+        ddlJPanel.setBackground(new java.awt.Color(255, 255, 255));
+
         javax.swing.GroupLayout ddlJPanelLayout = new javax.swing.GroupLayout(ddlJPanel);
         ddlJPanel.setLayout(ddlJPanelLayout);
         ddlJPanelLayout.setHorizontalGroup(
             ddlJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 913, Short.MAX_VALUE)
+            .addGap(0, 895, Short.MAX_VALUE)
         );
         ddlJPanelLayout.setVerticalGroup(
             ddlJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 618, Short.MAX_VALUE)
+            .addGap(0, 580, Short.MAX_VALUE)
         );
 
         LLMWorkBenchJTabbedPane.addTab("DDL Workbench", ddlJPanel);
+
+        promptJPanel.setBackground(new java.awt.Color(255, 255, 255));
 
         javax.swing.GroupLayout promptJPanelLayout = new javax.swing.GroupLayout(promptJPanel);
         promptJPanel.setLayout(promptJPanelLayout);
         promptJPanelLayout.setHorizontalGroup(
             promptJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 913, Short.MAX_VALUE)
+            .addGap(0, 895, Short.MAX_VALUE)
         );
         promptJPanelLayout.setVerticalGroup(
             promptJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 618, Short.MAX_VALUE)
+            .addGap(0, 580, Short.MAX_VALUE)
         );
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
@@ -1638,9 +1721,92 @@ public class DashboardForm extends javax.swing.JFrame {
 
         LLMWorkBenchJTabbedPane.addTab("Prompt Enginnering", jPanel3);
 
-        jDesktopPane1.setLayer(welcomeJLabel1, javax.swing.JLayeredPane.DEFAULT_LAYER);
-        jDesktopPane1.setLayer(welcomeJLabel2, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        jToolBar1.setBackground(new java.awt.Color(255, 255, 255));
+        jToolBar1.setBorder(null);
+        jToolBar1.setRollover(true);
+
+        jButton1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/add-document-new16.png"))); // NOI18N
+        jButton1.setText("New Project");
+        jButton1.setToolTipText("New Project");
+        jButton1.setFocusable(false);
+        jButton1.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        jButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton1ActionPerformed(evt);
+            }
+        });
+        jToolBar1.add(jButton1);
+
+        jButton2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/diskette16.png"))); // NOI18N
+        jButton2.setText("Save Project");
+        jButton2.setToolTipText("Save Project");
+        jButton2.setFocusable(false);
+        jButton2.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
+        jToolBar1.add(jButton2);
+
+        jButton3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/open-folder16.png"))); // NOI18N
+        jButton3.setText("Load Project");
+        jButton3.setToolTipText("Load Project");
+        jButton3.setFocusable(false);
+        jButton3.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        jButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton3ActionPerformed(evt);
+            }
+        });
+        jToolBar1.add(jButton3);
+
+        jLabel1.setText("    |    ");
+        jToolBar1.add(jLabel1);
+
+        jButton5.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/diskette16.png"))); // NOI18N
+        jButton5.setText("Save File");
+        jButton5.setToolTipText("Save file");
+        jButton5.setFocusable(false);
+        jButton5.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        jButton5.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton5ActionPerformed(evt);
+            }
+        });
+        jToolBar1.add(jButton5);
+
+        jButton4.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/open-folder16.png"))); // NOI18N
+        jButton4.setText("Open Folder");
+        jButton4.setToolTipText("Open Folder");
+        jButton4.setFocusable(false);
+        jButton4.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        jButton4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton4ActionPerformed(evt);
+            }
+        });
+        jToolBar1.add(jButton4);
+
+        jToolBar2.setBackground(new java.awt.Color(255, 255, 255));
+        jToolBar2.setRollover(true);
+
+        jToolBar3.setBackground(new java.awt.Color(255, 255, 255));
+        jToolBar3.setRollover(true);
+
+        welcomeJLabel1.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
+        welcomeJLabel1.setText("LLM Workbench v0.2");
+        jToolBar3.add(welcomeJLabel1);
+
+        welcomeJLabel2.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
+        welcomeJLabel2.setForeground(new java.awt.Color(255, 51, 51));
+        welcomeJLabel2.setText("  - Research Preview");
+        jToolBar3.add(welcomeJLabel2);
+
         jDesktopPane1.setLayer(LLMWorkBenchJTabbedPane, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        jDesktopPane1.setLayer(jToolBar1, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        jDesktopPane1.setLayer(jToolBar2, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        jDesktopPane1.setLayer(jToolBar3, javax.swing.JLayeredPane.DEFAULT_LAYER);
 
         javax.swing.GroupLayout jDesktopPane1Layout = new javax.swing.GroupLayout(jDesktopPane1);
         jDesktopPane1.setLayout(jDesktopPane1Layout);
@@ -1648,21 +1814,28 @@ public class DashboardForm extends javax.swing.JFrame {
             jDesktopPane1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jDesktopPane1Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(welcomeJLabel1)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(welcomeJLabel2)
-                .addContainerGap())
-            .addComponent(LLMWorkBenchJTabbedPane)
+                .addGroup(jDesktopPane1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jToolBar1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jDesktopPane1Layout.createSequentialGroup()
+                        .addGroup(jDesktopPane1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(jToolBar3, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(LLMWorkBenchJTabbedPane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jToolBar2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
         );
         jDesktopPane1Layout.setVerticalGroup(
             jDesktopPane1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jDesktopPane1Layout.createSequentialGroup()
-                .addComponent(LLMWorkBenchJTabbedPane)
+                .addContainerGap()
+                .addComponent(jToolBar1, javax.swing.GroupLayout.PREFERRED_SIZE, 29, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jDesktopPane1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(welcomeJLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(welcomeJLabel1))
-                .addGap(4, 4, 4))
+                .addGroup(jDesktopPane1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jDesktopPane1Layout.createSequentialGroup()
+                        .addComponent(jToolBar2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(0, 0, Short.MAX_VALUE))
+                    .addComponent(LLMWorkBenchJTabbedPane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jToolBar3, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
@@ -1799,6 +1972,31 @@ public class DashboardForm extends javax.swing.JFrame {
         newProject();
     }//GEN-LAST:event_newProjectJMenuItemActionPerformed
 
+    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+        // TODO add your handling code here:
+        newProject();
+    }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        // TODO add your handling code here:
+        saveProject();
+    }//GEN-LAST:event_jButton2ActionPerformed
+
+    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+        // TODO add your handling code here:
+        loadProject();
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
+        // TODO add your handling code here:
+        saveCurrentFile();
+    }//GEN-LAST:event_jButton5ActionPerformed
+
+    private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
+        // TODO add your handling code here:
+        openProject();
+    }//GEN-LAST:event_jButton4ActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1827,9 +2025,18 @@ public class DashboardForm extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JTabbedPane LLMWorkBenchJTabbedPane;
     private javax.swing.JPanel ddlJPanel;
+    private javax.swing.JButton jButton1;
+    private javax.swing.JButton jButton2;
+    private javax.swing.JButton jButton3;
+    private javax.swing.JButton jButton4;
+    private javax.swing.JButton jButton5;
     private javax.swing.JDesktopPane jDesktopPane1;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JMenu jMenu1;
+    private javax.swing.JMenu jMenu2;
     private javax.swing.JMenu jMenu5;
     private javax.swing.JMenuBar jMenuBar1;
+    private javax.swing.JMenuBar jMenuBar2;
     private javax.swing.JMenuItem jMenuItem1;
     private javax.swing.JMenuItem jMenuItem17;
     private javax.swing.JMenuItem jMenuItem18;
@@ -1838,6 +2045,9 @@ public class DashboardForm extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
+    private javax.swing.JToolBar jToolBar1;
+    private javax.swing.JToolBar jToolBar2;
+    private javax.swing.JToolBar jToolBar3;
     private javax.swing.JMenuItem loadProjectJMenuItem;
     private javax.swing.JMenu masterJMenu;
     private javax.swing.JMenuItem newProjectJMenuItem;

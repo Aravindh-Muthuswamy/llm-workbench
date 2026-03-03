@@ -61,7 +61,7 @@ public class NewLoadingJFrame extends javax.swing.JFrame {
         jLabel3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/undraw_data-at-work_3tbf_scaled.png"))); // NOI18N
 
         welcomeJLabel2.setFont(new java.awt.Font("Helvetica Neue", 0, 24)); // NOI18N
-        welcomeJLabel2.setText("LLM Workbench v1.0");
+        welcomeJLabel2.setText("LLM Workbench v0.2");
 
         welcomeJLabel4.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
         welcomeJLabel4.setForeground(new java.awt.Color(255, 51, 51));
