@@ -1,2 +1,2 @@
-# vanigam-pos-professional
-vanigam desktop pos professional
+# LLM Workbench
+LLM Workbench - research preview
