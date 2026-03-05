@@ -290,8 +290,8 @@
                 <Container class="javax.swing.JPanel" name="ddlJPanel">
                   <Constraints>
                     <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
-                      <JTabbedPaneConstraints tabName="DDL Workbench">
-                        <Property name="tabTitle" type="java.lang.String" value="DDL Workbench"/>
+                      <JTabbedPaneConstraints tabName="Data Schema Workbench">
+                        <Property name="tabTitle" type="java.lang.String" value="Data Schema Workbench"/>
                       </JTabbedPaneConstraints>
                     </Constraint>
                   </Constraints>

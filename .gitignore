@@ -1,3 +1,5 @@
 /vanigam.db
 target/llm-workbench-0.2.jar
 target/
+target/llm-workbench-1.0-SNAPSHOT.jar
+/target

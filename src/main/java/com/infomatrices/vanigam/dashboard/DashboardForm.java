@@ -1784,7 +1784,7 @@ public class DashboardForm extends javax.swing.JFrame {
             .addGap(0, 582, Short.MAX_VALUE)
         );
 
-        LLMWorkBenchJTabbedPane.addTab("DDL Workbench", ddlJPanel);
+        LLMWorkBenchJTabbedPane.addTab("Data Schema Workbench", ddlJPanel);
 
         javax.swing.GroupLayout promptJPanelLayout = new javax.swing.GroupLayout(promptJPanel);
         promptJPanel.setLayout(promptJPanelLayout);
