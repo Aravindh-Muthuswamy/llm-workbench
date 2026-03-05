@@ -381,6 +381,7 @@ public class PromptGenerator {
             case "py":         return "Python";
             case "js":         return "JavaScript";
             case "ts":         return "TypeScript";
+            case "tsx":        return "TypeScript";
             case "html":       return "HTML";
             case "css":        return "CSS";
             case "xml":        return "XML";

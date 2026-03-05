@@ -34,8 +34,9 @@ public class NewLoadingJFrame extends javax.swing.JFrame {
         jPanel1 = new javax.swing.JPanel();
         jProgressBar = new javax.swing.JProgressBar();
         loadingJLabel = new javax.swing.JLabel();
-        jLabel3 = new javax.swing.JLabel();
         welcomeJLabel2 = new javax.swing.JLabel();
+        loadingJLabel1 = new javax.swing.JLabel();
+        welcomeJLabel5 = new javax.swing.JLabel();
         welcomeJLabel4 = new javax.swing.JLabel();
 
         welcomeJLabel1.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
@@ -50,68 +51,77 @@ public class NewLoadingJFrame extends javax.swing.JFrame {
         setUndecorated(true);
         setResizable(false);
 
-        jPanel1.setBackground(new java.awt.Color(255, 255, 255));
-
         loadingJLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         loadingJLabel.setText("Loading...");
         loadingJLabel.setHorizontalTextPosition(javax.swing.SwingConstants.LEFT);
 
-        jLabel3.setFont(new java.awt.Font("Helvetica Neue", 1, 36)); // NOI18N
-        jLabel3.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        jLabel3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/undraw_data-at-work_3tbf_scaled.png"))); // NOI18N
+        welcomeJLabel2.setFont(new java.awt.Font("Helvetica Neue", 0, 36)); // NOI18N
+        welcomeJLabel2.setText("LLM Workbench");
 
-        welcomeJLabel2.setFont(new java.awt.Font("Helvetica Neue", 0, 24)); // NOI18N
-        welcomeJLabel2.setText("LLM Workbench v0.2");
+        loadingJLabel1.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        loadingJLabel1.setText("v0.3");
+        loadingJLabel1.setHorizontalTextPosition(javax.swing.SwingConstants.LEFT);
 
-        welcomeJLabel4.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
-        welcomeJLabel4.setForeground(new java.awt.Color(255, 51, 51));
-        welcomeJLabel4.setText("Research Preview");
+        welcomeJLabel5.setFont(new java.awt.Font("Helvetica Neue", 0, 36)); // NOI18N
+        welcomeJLabel5.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/workbench.png"))); // NOI18N
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap(53, Short.MAX_VALUE)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(54, 54, 54)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(loadingJLabel)
-                            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                .addComponent(jLabel3, javax.swing.GroupLayout.DEFAULT_SIZE, 466, Short.MAX_VALUE)
-                                .addComponent(jProgressBar, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(168, 168, 168)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addComponent(welcomeJLabel4)
-                            .addComponent(welcomeJLabel2))))
-                .addContainerGap(57, Short.MAX_VALUE))
+                            .addComponent(jProgressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 466, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(34, 34, 34))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                        .addComponent(welcomeJLabel2)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(loadingJLabel1)
+                        .addGap(122, 122, 122))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                        .addComponent(welcomeJLabel5)
+                        .addGap(209, 209, 209))))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addGap(34, 34, 34)
-                .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 277, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addGap(23, 23, 23)
+                .addComponent(welcomeJLabel5)
+                .addGap(31, 31, 31)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(welcomeJLabel2)
+                    .addComponent(loadingJLabel1))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(welcomeJLabel2)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(welcomeJLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 48, Short.MAX_VALUE)
                 .addComponent(loadingJLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jProgressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 11, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18))
+                .addContainerGap(31, Short.MAX_VALUE))
         );
+
+        welcomeJLabel4.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
+        welcomeJLabel4.setText("build 05032026");
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(welcomeJLabel4)
+                .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(layout.createSequentialGroup()
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(welcomeJLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();
@@ -144,13 +154,14 @@ public class NewLoadingJFrame extends javax.swing.JFrame {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JLabel jLabel3;
     private javax.swing.JPanel jPanel1;
     public javax.swing.JProgressBar jProgressBar;
     public javax.swing.JLabel loadingJLabel;
+    public javax.swing.JLabel loadingJLabel1;
     private javax.swing.JLabel welcomeJLabel1;
     private javax.swing.JLabel welcomeJLabel2;
     private javax.swing.JLabel welcomeJLabel3;
     private javax.swing.JLabel welcomeJLabel4;
+    private javax.swing.JLabel welcomeJLabel5;
     // End of variables declaration//GEN-END:variables
 }

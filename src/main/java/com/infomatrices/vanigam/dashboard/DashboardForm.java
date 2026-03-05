@@ -4,6 +4,7 @@
  */
 package com.infomatrices.vanigam.dashboard;
 
+import com.infomatrices.vanigam.dashboard.components.AboutJDialog;
 import static com.infomatrices.vanigam.utils.CodeUtils.getSyntaxStyle;
 import com.infomatrices.vanigam.utils.FileSearchWorker;
 import com.infomatrices.vanigam.utils.PromptGenerator;
@@ -69,6 +70,8 @@ public class DashboardForm extends javax.swing.JFrame {
     private javax.swing.SwingWorker<Void, DefaultMutableTreeNode> searchWorker;
     private File projectRootFolder;
     private JComboBox<String> templateSelector;
+    private final String versionNumber = "v0.3";
+    private final String buildNumber = " - build 05032026";
 
     /**
      * Creates new form DashboardForm
@@ -79,6 +82,8 @@ public class DashboardForm extends javax.swing.JFrame {
         loadComponents();
         loadPromptComponents();
         loadDdlComponents();
+        versionLabel.setText("LLM Workbench " + versionNumber);
+        buildLabel.setText(buildNumber);
     }
 
     private void loadDdlComponents() {
@@ -87,8 +92,15 @@ public class DashboardForm extends javax.swing.JFrame {
         ddlArea.setCodeFoldingEnabled(true);
         ddlArea.setAntiAliasingEnabled(true);
         ddlArea.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 13));
-        ddlArea.setText("-- Paste your DDL statements here\n-- e.g. CREATE TABLE, ALTER TABLE...\n");
-
+        ddlArea.setText("-- Paste your DDL statements here\n-- e.g. CREATE TABLE, ALTER TABLE...\n--If you are using a coding agent please give the table names and access to your db server to the agent\n");
+        try {
+            org.fife.ui.rsyntaxtextarea.Theme theme = org.fife.ui.rsyntaxtextarea.Theme.load(
+                    getClass().getResourceAsStream(
+                            "/org/fife/ui/rsyntaxtextarea/themes/monokai.xml"));
+            theme.apply(ddlArea);
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
         JButton clearDdlBtn = new JButton("Clear");
         clearDdlBtn.addActionListener(e -> ddlArea.setText(""));
 
@@ -117,7 +129,14 @@ public class DashboardForm extends javax.swing.JFrame {
         promptArea.setLineWrap(true);
         promptArea.setWrapStyleWord(true);
         promptArea.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 13));
-
+        try {
+            org.fife.ui.rsyntaxtextarea.Theme theme = org.fife.ui.rsyntaxtextarea.Theme.load(
+                    getClass().getResourceAsStream(
+                            "/org/fife/ui/rsyntaxtextarea/themes/monokai.xml"));
+            theme.apply(promptArea);
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
         JButton generateBtn = new JButton("Generate Prompt");
         generateBtn.addActionListener(e -> generatePrompt());
 
@@ -408,7 +427,7 @@ public class DashboardForm extends javax.swing.JFrame {
                     "Project loaded successfully.",
                     "Loaded", JOptionPane.INFORMATION_MESSAGE);
             if (state.projectFolder != null && !state.projectFolder.isEmpty()) {
-                setTitle("LLM Workbench v0.2 - " + new File(state.projectFolder).getName());
+                setTitle("LLM Workbench " + versionNumber + " - " + new File(state.projectFolder).getName());
             }
 
         } catch (Exception ex) {
@@ -501,6 +520,14 @@ public class DashboardForm extends javax.swing.JFrame {
         textArea.setCodeFoldingEnabled(true);
         textArea.setAntiAliasingEnabled(true);
         textArea.setFont(new Font("JetBrains Mono", Font.PLAIN, 13));
+        try {
+            org.fife.ui.rsyntaxtextarea.Theme theme = org.fife.ui.rsyntaxtextarea.Theme.load(
+                    getClass().getResourceAsStream(
+                            "/org/fife/ui/rsyntaxtextarea/themes/monokai.xml"));
+            theme.apply(textArea);
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
 
         // Autocomplete
         DefaultCompletionProvider provider = createCompletionProvider();
@@ -536,33 +563,45 @@ public class DashboardForm extends javax.swing.JFrame {
         terminalTabs.setPreferredSize(new Dimension(0, 220));
 // Add a permanent "+" tab at the end
         terminalTabs.addTab("+", null);
-        int plusTabIndex = terminalTabs.getTabCount() - 1;
+
+        final boolean[] isHandlingTabChange = {false}; // re-entrancy guard
 
         terminalTabs.addChangeListener(e -> {
+            if (isHandlingTabChange[0]) {
+                return; // prevent recursive firing
+            }
             int selected = terminalTabs.getSelectedIndex();
-            if (selected == terminalTabs.getTabCount() - 1) {
+            int plusIndex = terminalTabs.getTabCount() - 1;
 
-                // Snap back immediately so UI doesn't freeze on "+" tab
-                int prev = selected - 1;
-                if (prev >= 0) {
-                    terminalTabs.setSelectedIndex(prev);
-                }
+            if (selected == plusIndex) {
+                isHandlingTabChange[0] = true;
 
-                // Create terminal in background thread
+                // Snap back to previous tab immediately
+                int prev = Math.max(0, selected - 1);
+                terminalTabs.setSelectedIndex(prev);
+
+                isHandlingTabChange[0] = false;
+
+                // Create terminal in background
                 new javax.swing.SwingWorker<JediTermWidget, Void>() {
                     @Override
                     protected JediTermWidget doInBackground() {
-                        return createTerminal();  // runs off EDT
+                        return createTerminal();
                     }
 
                     @Override
                     protected void done() {
                         try {
                             JediTermWidget newTerm = get();
+
+                            isHandlingTabChange[0] = true;
                             int insertAt = terminalTabs.getTabCount() - 1; // before "+"
-                            terminalTabs.insertTab("Terminal " + insertAt, null, newTerm, null, insertAt);
+                            terminalTabs.insertTab("Terminal " + (insertAt + 1), null, newTerm, null, insertAt);
                             terminalTabs.setSelectedIndex(insertAt);
+                            isHandlingTabChange[0] = false;
+
                         } catch (Exception ex) {
+                            isHandlingTabChange[0] = false;
                             JOptionPane.showMessageDialog(null,
                                     "Could not start terminal: " + ex.getMessage(),
                                     "Terminal Error", JOptionPane.ERROR_MESSAGE);
@@ -731,17 +770,17 @@ public class DashboardForm extends javax.swing.JFrame {
         outerSplit.setResizeWeight(0.75);
         java.awt.Color white = java.awt.Color.WHITE;
 
-        jPanel1.setBackground(white);
-        leftPanel.setBackground(white);
-        searchPanel.setBackground(white);
-        editorPanel.setBackground(white);
-        rightPanel.setBackground(white);
-        promptJPanel.setBackground(white);
-        ddlJPanel.setBackground(white);
-        terminalTabs.setBackground(white);
-        editorTabs.setBackground(white);
-        tree.setBackground(white);
-        fileList.setBackground(white);
+//        jPanel1.setBackground(white);
+//        leftPanel.setBackground(white);
+//        searchPanel.setBackground(white);
+//        editorPanel.setBackground(white);
+//        rightPanel.setBackground(white);
+//        promptJPanel.setBackground(white);
+//        ddlJPanel.setBackground(white);
+//        terminalTabs.setBackground(white);
+//        editorTabs.setBackground(white);
+//        tree.setBackground(white);
+//        fileList.setBackground(white);
         workbenchJPanel.setLayout(new BorderLayout());
         workbenchJPanel.add(outerSplit, BorderLayout.CENTER);
 
@@ -1007,7 +1046,7 @@ public class DashboardForm extends javax.swing.JFrame {
                 return this;
             }
         });
-        setTitle("LLM Workbench v0.2 - " + folder.getName());  // add this
+        setTitle("LLM Workbench " + versionNumber + " - " + folder.getName());  // add this
 
     }
 
@@ -1073,6 +1112,14 @@ public class DashboardForm extends javax.swing.JFrame {
             fileTextArea.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 13));
             fileTextArea.setText(content);
             fileTextArea.setCaretPosition(0);
+            try {
+                org.fife.ui.rsyntaxtextarea.Theme theme = org.fife.ui.rsyntaxtextarea.Theme.load(
+                        getClass().getResourceAsStream(
+                                "/org/fife/ui/rsyntaxtextarea/themes/monokai.xml"));
+                theme.apply(fileTextArea);
+            } catch (java.io.IOException e) {
+                e.printStackTrace();
+            }
 
             // Autocomplete
             DefaultCompletionProvider provider = createCompletionProvider();
@@ -1362,6 +1409,8 @@ public class DashboardForm extends javax.swing.JFrame {
 
     private JediTermWidget createTerminal() {
         JediTermWidget terminal = new JediTermWidget(new DefaultSettingsProvider() {
+
+            // ── Font ──────────────────────────────────────────────────────────
             @Override
             public float getTerminalFontSize() {
                 return 13f;
@@ -1369,10 +1418,8 @@ public class DashboardForm extends javax.swing.JFrame {
 
             @Override
             public java.awt.Font getTerminalFont() {
-                // Try native monospace fonts in order of preference per OS
                 String os = System.getProperty("os.name").toLowerCase();
                 String[] candidates;
-
                 if (os.contains("win")) {
                     candidates = new String[]{"Cascadia Code", "Cascadia Mono", "Consolas", "Lucida Console", "Courier New"};
                 } else if (os.contains("mac")) {
@@ -1380,20 +1427,74 @@ public class DashboardForm extends javax.swing.JFrame {
                 } else {
                     candidates = new String[]{"Ubuntu Mono", "DejaVu Sans Mono", "Liberation Mono", "Monospace", "Courier New"};
                 }
-
-                // Pick the first font that is actually installed
                 java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
                 java.util.Set<String> available = new java.util.HashSet<>(
                         java.util.Arrays.asList(ge.getAvailableFontFamilyNames()));
-
                 for (String name : candidates) {
                     if (available.contains(name)) {
                         return new java.awt.Font(name, java.awt.Font.PLAIN, 14);
                     }
                 }
-
-                // Fallback — Java's built-in monospaced
                 return new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 14);
+            }
+
+            // ── Dark theme ────────────────────────────────────────────────────
+            // Default fg/bg colours (what you see when no ANSI codes are active)
+            @Override
+            public com.jediterm.terminal.TextStyle getDefaultStyle() {
+                return new com.jediterm.terminal.TextStyle(
+                        com.jediterm.terminal.TerminalColor.rgb(0xF8, 0xF8, 0xF2), // fg: near-white
+                        com.jediterm.terminal.TerminalColor.rgb(0x1E, 0x1E, 0x1E) // bg: dark
+                );
+            }
+
+            // Selection highlight
+            @Override
+            public com.jediterm.terminal.TextStyle getSelectionColor() {
+                return new com.jediterm.terminal.TextStyle(
+                        com.jediterm.terminal.TerminalColor.WHITE,
+                        com.jediterm.terminal.TerminalColor.rgb(0x44, 0x47, 0x5A)
+                );
+            }
+
+            // Dracula 16-colour palette
+            @Override
+            public com.jediterm.terminal.emulator.ColorPalette getTerminalColorPalette() {
+                final com.jediterm.core.Color[] PALETTE = {
+                    new com.jediterm.core.Color(0x1C1C1C), // 0  black
+                    new com.jediterm.core.Color(0xFF5555), // 1  red
+                    new com.jediterm.core.Color(0x50FA7B), // 2  green
+                    new com.jediterm.core.Color(0xF1FA8C), // 3  yellow
+                    new com.jediterm.core.Color(0x6272A4), // 4  blue
+                    new com.jediterm.core.Color(0xFF79C6), // 5  magenta
+                    new com.jediterm.core.Color(0x8BE9FD), // 6  cyan
+                    new com.jediterm.core.Color(0xBBBBBB), // 7  white
+                    new com.jediterm.core.Color(0x555555), // 8  bright black
+                    new com.jediterm.core.Color(0xFF6E6E), // 9  bright red
+                    new com.jediterm.core.Color(0x69FF94), // 10 bright green
+                    new com.jediterm.core.Color(0xFFFF87), // 11 bright yellow
+                    new com.jediterm.core.Color(0x6272A4), // 12 bright blue
+                    new com.jediterm.core.Color(0xFF92DF), // 13 bright magenta
+                    new com.jediterm.core.Color(0xA4FFFF), // 14 bright cyan
+                    new com.jediterm.core.Color(0xFFFFFF), // 15 bright white
+                };
+                return new com.jediterm.terminal.emulator.ColorPalette() {
+                    @Override
+                    public com.jediterm.core.Color getForegroundByColorIndex(int index) {
+                        if (index >= 0 && index < PALETTE.length) {
+                            return PALETTE[index];
+                        }
+                        return new com.jediterm.core.Color(0xF8F8F2);
+                    }
+
+                    @Override
+                    public com.jediterm.core.Color getBackgroundByColorIndex(int index) {
+                        if (index >= 0 && index < PALETTE.length) {
+                            return PALETTE[index];
+                        }
+                        return new com.jediterm.core.Color(0x1E1E1E);
+                    }
+                };
             }
         });
 
@@ -1415,7 +1516,6 @@ public class DashboardForm extends javax.swing.JFrame {
                     .setInitialRows(20)
                     .start();
 
-            // Build TtyConnector manually — no com.jediterm.pty needed
             TtyConnector connector = new TtyConnector() {
                 private final BufferedReader reader = new BufferedReader(
                         new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
@@ -1478,8 +1578,7 @@ public class DashboardForm extends javax.swing.JFrame {
 
                 @Override
                 public void resize(com.jediterm.core.util.TermSize termSize) {
-                    process.setWinSize(new com.pty4j.WinSize(
-                            termSize.getColumns(), termSize.getRows()));
+                    process.setWinSize(new com.pty4j.WinSize(termSize.getColumns(), termSize.getRows()));
                 }
 
                 @Override
@@ -1544,7 +1643,7 @@ public class DashboardForm extends javax.swing.JFrame {
 
         // Clear DDL
         if (ddlArea != null) {
-            ddlArea.setText("-- Paste your DDL statements here\n-- e.g. CREATE TABLE, ALTER TABLE...\n");
+            ddlArea.setText("-- Paste your DDL statements here\n-- e.g. CREATE TABLE, ALTER TABLE...\n--If you are using a coding agent please give the table names and access to your db server to the agent\n");
         }
 
         // Clear prompt
@@ -1557,7 +1656,7 @@ public class DashboardForm extends javax.swing.JFrame {
             verboseCheckBox.setSelected(false);
         }
 
-        setTitle("LLM Workbench v0.2 - New Project");
+        setTitle("LLM Workbench " + versionNumber + " - New Project");
     }
 
     /**
@@ -1592,17 +1691,17 @@ public class DashboardForm extends javax.swing.JFrame {
         jButton4 = new javax.swing.JButton();
         jToolBar2 = new javax.swing.JToolBar();
         jToolBar3 = new javax.swing.JToolBar();
-        welcomeJLabel1 = new javax.swing.JLabel();
-        welcomeJLabel2 = new javax.swing.JLabel();
+        versionLabel = new javax.swing.JLabel();
+        buildLabel = new javax.swing.JLabel();
         jMenuBar1 = new javax.swing.JMenuBar();
         masterJMenu = new javax.swing.JMenu();
+        javax.swing.JMenuItem openProjectJMenuItem = new javax.swing.JMenuItem();
+        saveFileJMenuItem = new javax.swing.JMenuItem();
+        jMenu3 = new javax.swing.JMenu();
         newProjectJMenuItem = new javax.swing.JMenuItem();
         saveProjectJMenuItem = new javax.swing.JMenuItem();
         loadProjectJMenuItem = new javax.swing.JMenuItem();
-        javax.swing.JMenuItem openProjectJMenuItem = new javax.swing.JMenuItem();
-        saveFileJMenuItem = new javax.swing.JMenuItem();
         jMenu5 = new javax.swing.JMenu();
-        jMenuItem17 = new javax.swing.JMenuItem();
         jMenuItem18 = new javax.swing.JMenuItem();
 
         jMenuItem1.setText("jMenuItem1");
@@ -1618,7 +1717,8 @@ public class DashboardForm extends javax.swing.JFrame {
         jMenuBar2.add(jMenu2);
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("LLM Workbench v0.2");
+        setTitle("LLM Workbench v0.3");
+        setIconImages(null);
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -1630,7 +1730,6 @@ public class DashboardForm extends javax.swing.JFrame {
             }
         });
 
-        jPanel2.setBackground(new java.awt.Color(51, 153, 255));
         jPanel2.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyPressed(java.awt.event.KeyEvent evt) {
                 jPanel2KeyPressed(evt);
@@ -1640,7 +1739,6 @@ public class DashboardForm extends javax.swing.JFrame {
             }
         });
 
-        jDesktopPane1.setBackground(new java.awt.Color(255, 255, 255));
         jDesktopPane1.setAutoscrolls(true);
         jDesktopPane1.setDoubleBuffered(true);
         jDesktopPane1.addKeyListener(new java.awt.event.KeyAdapter() {
@@ -1649,22 +1747,17 @@ public class DashboardForm extends javax.swing.JFrame {
             }
         });
 
-        LLMWorkBenchJTabbedPane.setBackground(new java.awt.Color(255, 255, 255));
-        LLMWorkBenchJTabbedPane.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(153, 153, 153)));
-        LLMWorkBenchJTabbedPane.setTabPlacement(javax.swing.JTabbedPane.BOTTOM);
         LLMWorkBenchJTabbedPane.setMinimumSize(new java.awt.Dimension(140, 95));
-
-        workbenchJPanel.setBackground(new java.awt.Color(255, 255, 255));
 
         javax.swing.GroupLayout workbenchJPanelLayout = new javax.swing.GroupLayout(workbenchJPanel);
         workbenchJPanel.setLayout(workbenchJPanelLayout);
         workbenchJPanelLayout.setHorizontalGroup(
             workbenchJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 895, Short.MAX_VALUE)
+            .addGap(0, 897, Short.MAX_VALUE)
         );
         workbenchJPanelLayout.setVerticalGroup(
             workbenchJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 580, Short.MAX_VALUE)
+            .addGap(0, 582, Short.MAX_VALUE)
         );
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
@@ -1680,32 +1773,28 @@ public class DashboardForm extends javax.swing.JFrame {
 
         LLMWorkBenchJTabbedPane.addTab("Workbench", jPanel1);
 
-        ddlJPanel.setBackground(new java.awt.Color(255, 255, 255));
-
         javax.swing.GroupLayout ddlJPanelLayout = new javax.swing.GroupLayout(ddlJPanel);
         ddlJPanel.setLayout(ddlJPanelLayout);
         ddlJPanelLayout.setHorizontalGroup(
             ddlJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 895, Short.MAX_VALUE)
+            .addGap(0, 897, Short.MAX_VALUE)
         );
         ddlJPanelLayout.setVerticalGroup(
             ddlJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 580, Short.MAX_VALUE)
+            .addGap(0, 582, Short.MAX_VALUE)
         );
 
         LLMWorkBenchJTabbedPane.addTab("DDL Workbench", ddlJPanel);
-
-        promptJPanel.setBackground(new java.awt.Color(255, 255, 255));
 
         javax.swing.GroupLayout promptJPanelLayout = new javax.swing.GroupLayout(promptJPanel);
         promptJPanel.setLayout(promptJPanelLayout);
         promptJPanelLayout.setHorizontalGroup(
             promptJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 895, Short.MAX_VALUE)
+            .addGap(0, 897, Short.MAX_VALUE)
         );
         promptJPanelLayout.setVerticalGroup(
             promptJPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 580, Short.MAX_VALUE)
+            .addGap(0, 582, Short.MAX_VALUE)
         );
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
@@ -1721,7 +1810,6 @@ public class DashboardForm extends javax.swing.JFrame {
 
         LLMWorkBenchJTabbedPane.addTab("Prompt Enginnering", jPanel3);
 
-        jToolBar1.setBackground(new java.awt.Color(255, 255, 255));
         jToolBar1.setBorder(null);
         jToolBar1.setRollover(true);
 
@@ -1791,17 +1879,15 @@ public class DashboardForm extends javax.swing.JFrame {
         jToolBar2.setBackground(new java.awt.Color(255, 255, 255));
         jToolBar2.setRollover(true);
 
-        jToolBar3.setBackground(new java.awt.Color(255, 255, 255));
         jToolBar3.setRollover(true);
 
-        welcomeJLabel1.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
-        welcomeJLabel1.setText("LLM Workbench v0.2");
-        jToolBar3.add(welcomeJLabel1);
+        versionLabel.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
+        versionLabel.setText("LLM Workbench v0.3");
+        jToolBar3.add(versionLabel);
 
-        welcomeJLabel2.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
-        welcomeJLabel2.setForeground(new java.awt.Color(255, 51, 51));
-        welcomeJLabel2.setText("  - Research Preview");
-        jToolBar3.add(welcomeJLabel2);
+        buildLabel.setFont(new java.awt.Font("Helvetica Neue", 0, 14)); // NOI18N
+        buildLabel.setText("  - Development Preview");
+        jToolBar3.add(buildLabel);
 
         jDesktopPane1.setLayer(LLMWorkBenchJTabbedPane, javax.swing.JLayeredPane.DEFAULT_LAYER);
         jDesktopPane1.setLayer(jToolBar1, javax.swing.JLayeredPane.DEFAULT_LAYER);
@@ -1851,31 +1937,7 @@ public class DashboardForm extends javax.swing.JFrame {
 
         masterJMenu.setText("File");
 
-        newProjectJMenuItem.setText("New Project");
-        newProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                newProjectJMenuItemActionPerformed(evt);
-            }
-        });
-        masterJMenu.add(newProjectJMenuItem);
-
-        saveProjectJMenuItem.setText("Save Project");
-        saveProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveProjectJMenuItemActionPerformed(evt);
-            }
-        });
-        masterJMenu.add(saveProjectJMenuItem);
-
-        loadProjectJMenuItem.setText("Load Project");
-        loadProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                loadProjectJMenuItemActionPerformed(evt);
-            }
-        });
-        masterJMenu.add(loadProjectJMenuItem);
-
-        openProjectJMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+        openProjectJMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/open-folder16.png"))); // NOI18N
         openProjectJMenuItem.setText("Open Folder");
         openProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1884,6 +1946,7 @@ public class DashboardForm extends javax.swing.JFrame {
         });
         masterJMenu.add(openProjectJMenuItem);
 
+        saveFileJMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/diskette16.png"))); // NOI18N
         saveFileJMenuItem.setText("Save file");
         saveFileJMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1894,12 +1957,46 @@ public class DashboardForm extends javax.swing.JFrame {
 
         jMenuBar1.add(masterJMenu);
 
+        jMenu3.setText("Project");
+
+        newProjectJMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/add-document-new16.png"))); // NOI18N
+        newProjectJMenuItem.setText("New Project");
+        newProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                newProjectJMenuItemActionPerformed(evt);
+            }
+        });
+        jMenu3.add(newProjectJMenuItem);
+
+        saveProjectJMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/diskette16.png"))); // NOI18N
+        saveProjectJMenuItem.setText("Save Project");
+        saveProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveProjectJMenuItemActionPerformed(evt);
+            }
+        });
+        jMenu3.add(saveProjectJMenuItem);
+
+        loadProjectJMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/open-folder16.png"))); // NOI18N
+        loadProjectJMenuItem.setText("Load Project");
+        loadProjectJMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                loadProjectJMenuItemActionPerformed(evt);
+            }
+        });
+        jMenu3.add(loadProjectJMenuItem);
+
+        jMenuBar1.add(jMenu3);
+
         jMenu5.setText("Help");
 
-        jMenuItem17.setText("License");
-        jMenu5.add(jMenuItem17);
-
+        jMenuItem18.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/about16.png"))); // NOI18N
         jMenuItem18.setText("About");
+        jMenuItem18.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem18ActionPerformed(evt);
+            }
+        });
         jMenu5.add(jMenuItem18);
 
         jMenuBar1.add(jMenu5);
@@ -1995,7 +2092,14 @@ public class DashboardForm extends javax.swing.JFrame {
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
         // TODO add your handling code here:
         openProject();
+
     }//GEN-LAST:event_jButton4ActionPerformed
+
+    private void jMenuItem18ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem18ActionPerformed
+        // TODO add your handling code here:
+        AboutJDialog aboutJDialog = new AboutJDialog(this, true, "LLM Workbench " + versionNumber);
+        aboutJDialog.setVisible(true);
+    }//GEN-LAST:event_jMenuItem18ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -2024,6 +2128,7 @@ public class DashboardForm extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JTabbedPane LLMWorkBenchJTabbedPane;
+    private javax.swing.JLabel buildLabel;
     private javax.swing.JPanel ddlJPanel;
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
@@ -2034,11 +2139,11 @@ public class DashboardForm extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JMenu jMenu1;
     private javax.swing.JMenu jMenu2;
+    private javax.swing.JMenu jMenu3;
     private javax.swing.JMenu jMenu5;
     private javax.swing.JMenuBar jMenuBar1;
     private javax.swing.JMenuBar jMenuBar2;
     private javax.swing.JMenuItem jMenuItem1;
-    private javax.swing.JMenuItem jMenuItem17;
     private javax.swing.JMenuItem jMenuItem18;
     private javax.swing.JMenuItem jMenuItem4;
     private javax.swing.JMenuItem jMenuItem7;
@@ -2054,8 +2159,7 @@ public class DashboardForm extends javax.swing.JFrame {
     private javax.swing.JPanel promptJPanel;
     private javax.swing.JMenuItem saveFileJMenuItem;
     private javax.swing.JMenuItem saveProjectJMenuItem;
-    private javax.swing.JLabel welcomeJLabel1;
-    private javax.swing.JLabel welcomeJLabel2;
+    private javax.swing.JLabel versionLabel;
     private javax.swing.JPanel workbenchJPanel;
     // End of variables declaration//GEN-END:variables
 }
