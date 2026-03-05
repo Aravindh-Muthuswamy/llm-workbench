@@ -2,8 +2,6 @@
 
 > A Java Swing desktop application that helps you select coding files and DDL statements before generating prompts for Large Language Models.
 
-> 🚧 **Research Preview** — This software is currently in research preview and is **not intended for production use**. Features may be incomplete, unstable, or subject to breaking changes without notice.
-
 ---
 
 ## About
